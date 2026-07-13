@@ -2,19 +2,23 @@ import { useState, useEffect, useMemo, useRef, ChangeEvent, type ReactNode } fro
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen, Search, BookMarked, Lightbulb, Link as LinkIcon,
-  AlertTriangle, Copy, Download, Sparkles, Book,
+  AlertTriangle, Copy, Download, Upload, Sparkles, Book,
   ChevronRight, HelpCircle, Archive, ClipboardList, CheckCircle2,
-  Bookmark, Compass, Languages, Quote, Landmark, ZoomIn, ZoomOut, RotateCcw, Layers
+  Bookmark, Compass, Languages, Quote, Landmark, ZoomIn, ZoomOut, RotateCcw, Layers, List
 } from 'lucide-react';
 import { allBooks } from './data';
+import type { BookType } from './types';
 import { CornerAccents, FlourishDivider } from './components/Ornaments';
 import { QuizCard } from './components/QuizCard';
 import { LibraryProgressChart } from './components/LibraryProgressChart';
 import { CulturalHistory } from './components/CulturalHistory';
 import { ChapterDetail } from './components/ChapterDetail';
+import { Onboarding } from './components/Onboarding';
 import { splitVerseEntry, bibleGatewayUrl } from './utils/bibleLink';
 import { resolveHistoricalVerification, resolveScholarlyVerification, egwWritingsUrl } from './utils/sourceVerification';
 import { SourceVerification, SourceVerificationNotice } from './components/SourceVerification';
+import { buildHash, hashesEqual, parseHash, type AppTab, type RouteState } from './router';
+import { downloadBackup, importBackupJson } from './utils/backup';
 
 // Deterministic dust-mote field so layout is stable across renders.
 const DUST_MOTES = Array.from({ length: 26 }, (_, i) => {
@@ -37,6 +41,54 @@ const READING_ZOOM_MAX = 150;
 const READING_ZOOM_STEP = 10;
 const READING_ZOOM_DEFAULT = 100;
 const READING_ZOOM_KEY = 'egw-reading-zoom';
+const ONBOARDING_KEY = 'egw-onboarding-done';
+const LAST_READ_KEY = 'egw-last-read';
+
+function coverageLabel(book: BookType): string {
+  if (book.chapters.length >= book.totalChapters) {
+    return `Complete — all ${book.totalChapters} chapters`;
+  }
+  return `Preview — full guide coming soon (${book.chapters.length} of ${book.totalChapters})`;
+}
+
+function resolveInitialRoute(books: BookType[]): RouteState {
+  const fallback: RouteState = {
+    bookId: 'steps-to-christ',
+    chapterId: 'sc-1',
+    tab: 'study',
+    guided: false,
+  };
+
+  const apply = (partial: Partial<RouteState>): RouteState => {
+    const book = books.find((b) => b.id === partial.bookId) || books[0] || null;
+    if (!book) return fallback;
+    const chapter =
+      book.chapters.find((c) => c.id === partial.chapterId) || book.chapters[0] || null;
+    return {
+      bookId: book.id,
+      chapterId: chapter?.id || fallback.chapterId,
+      tab: partial.tab || 'study',
+      guided: !!partial.guided,
+    };
+  };
+
+  const fromHash = parseHash(window.location.hash);
+  if (fromHash?.bookId && fromHash?.chapterId) return apply(fromHash);
+
+  try {
+    const raw = localStorage.getItem(LAST_READ_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { bookId?: string; chapterId?: string };
+      if (parsed.bookId && parsed.chapterId) {
+        return apply({ bookId: parsed.bookId, chapterId: parsed.chapterId });
+      }
+    }
+  } catch {
+    // ignore corrupt last-read
+  }
+
+  return apply(fallback);
+}
 
 function DustMotes() {
   return (
@@ -63,17 +115,28 @@ function DustMotes() {
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'study' | 'library' | 'notes' | 'cultural'>('study');
-  const [selectedBookId, setSelectedBookId] = useState<string>('steps-to-christ');
-  const [selectedChapterId, setSelectedChapterId] = useState<string>('sc-1');
+  const books = allBooks;
+  const [routeSeed] = useState(() => resolveInitialRoute(books));
+  const [activeTab, setActiveTab] = useState<AppTab>(routeSeed.tab);
+  const [selectedBookId, setSelectedBookId] = useState<string>(routeSeed.bookId);
+  const [selectedChapterId, setSelectedChapterId] = useState<string>(routeSeed.chapterId);
   const [searchQuery, setSearchQuery] = useState('');
   const [showQuiz, setShowQuiz] = useState(false);
-  const [chapterPageOpen, setChapterPageOpen] = useState(false);
+  const [chapterPageOpen, setChapterPageOpen] = useState(routeSeed.guided);
+  const [mobileChapterDrawerOpen, setMobileChapterDrawerOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      return localStorage.getItem(ONBOARDING_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [notes, setNotes] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pTab, setPTab] = useState<'context' | 'sources' | 'literary'>('context');
   const toastTimer = useRef<number | undefined>(undefined);
-  const books = allBooks;
+  const applyingHash = useRef(false);
+  const backupFileRef = useRef<HTMLInputElement>(null);
   const [readingZoom, setReadingZoom] = useState(() => {
     try {
       const saved = localStorage.getItem(READING_ZOOM_KEY);
@@ -128,9 +191,56 @@ export default function App() {
     setShowQuiz(false);
   }, [selectedChapterId, selectedBookId]);
 
+  // Persist last-read so Study Desk can continue where the user left off
   useEffect(() => {
-    setChapterPageOpen(false);
-  }, [selectedBookId]);
+    try {
+      localStorage.setItem(
+        LAST_READ_KEY,
+        JSON.stringify({ bookId: selectedBookId, chapterId: selectedChapterId })
+      );
+    } catch {
+      // ignore quota errors
+    }
+  }, [selectedBookId, selectedChapterId]);
+
+  // Reflect deep state in the URL hash (refresh / share / back-button)
+  useEffect(() => {
+    if (applyingHash.current) {
+      applyingHash.current = false;
+      return;
+    }
+    const target = buildHash({
+      bookId: selectedBookId,
+      chapterId: selectedChapterId,
+      tab: activeTab,
+      guided: chapterPageOpen,
+    });
+    if (hashesEqual(window.location.hash, target)) return;
+    // Assign without a leading '#'; the browser adds it.
+    window.location.hash = target.replace(/^#/, '');
+  }, [selectedBookId, selectedChapterId, activeTab, chapterPageOpen]);
+
+  useEffect(() => {
+    const applyFromHash = () => {
+      const parsed = parseHash(window.location.hash);
+      if (!parsed?.bookId || !parsed?.chapterId) return;
+
+      const book = books.find((b) => b.id === parsed.bookId) || books[0];
+      if (!book) return;
+      const chapter =
+        book.chapters.find((c) => c.id === parsed.chapterId) || book.chapters[0];
+      if (!chapter) return;
+
+      applyingHash.current = true;
+      setSelectedBookId(book.id);
+      setSelectedChapterId(chapter.id);
+      if (parsed.tab) setActiveTab(parsed.tab);
+      if (typeof parsed.guided === 'boolean') setChapterPageOpen(parsed.guided);
+    };
+
+    window.addEventListener('hashchange', applyFromHash);
+    return () => window.removeEventListener('hashchange', applyFromHash);
+  }, [books]);
 
   const openChapterOnDesk = (bookId: string, chapterId: string) => {
     setSelectedBookId(bookId);
@@ -138,6 +248,18 @@ export default function App() {
     setActiveTab('study');
     setChapterPageOpen(false);
     setShowQuiz(false);
+    setMobileChapterDrawerOpen(false);
+  };
+
+  const handleOnboardingStart = () => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, '1');
+    } catch {
+      // ignore
+    }
+    setShowOnboarding(false);
+    setActiveTab('study');
+    setChapterPageOpen(true);
   };
 
   const handleMarkExplored = (chapterId: string) => {
@@ -168,6 +290,33 @@ export default function App() {
     setToastMessage(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExportBackup = () => {
+    try {
+      downloadBackup();
+      showToast('Full backup downloaded.');
+    } catch {
+      showToast('Could not export backup.');
+    }
+  };
+
+  const handleImportBackupFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const result = importBackupJson(text);
+      if (result.ok === false) {
+        showToast(result.error);
+        return;
+      }
+      showToast('Backup imported — reloading to apply…');
+      window.setTimeout(() => window.location.reload(), 600);
+    } catch {
+      showToast('Could not read backup file.');
+    }
   };
 
   const handleCopySummary = () => {
@@ -452,8 +601,9 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                   {currentBook.chapters.map(ch => (
                     <button
                       key={ch.id}
+                      type="button"
                       onClick={() => setSelectedChapterId(ch.id)}
-                      className={`w-full text-left py-2 px-2.5 rounded-sm text-xs transition-colors border ${
+                      className={`w-full text-left min-h-[44px] py-2 px-2.5 rounded-sm text-xs transition-colors border ${
                         selectedChapterId === ch.id
                           ? 'bg-[#2b241e]/55 text-[#d4af37] border-[#d4af37]/20 font-semibold'
                           : 'text-[#a39a8c] hover:bg-[#201e1b] border-transparent'
@@ -465,7 +615,17 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                 </div>
               </div>
             </motion.section>
-            <motion.section variants={riseItem} className="lg:col-span-9 order-2">
+            <motion.section variants={riseItem} className="lg:col-span-9 order-2 space-y-3">
+              <div className="lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMobileChapterDrawerOpen(true)}
+                  className="min-h-[44px] w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#1c1917] border border-[#3b3834] text-[#e3ddce] text-xs font-semibold uppercase tracking-widest rounded-sm hover:border-[#d4af37]/40 transition-colors"
+                >
+                  <List className="w-4 h-4 text-[#d4af37]" aria-hidden="true" />
+                  Chapters
+                </button>
+              </div>
               <ChapterDetail
                 book={currentBook}
                 chapter={currentChapter}
@@ -509,14 +669,16 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                       >
                         {/* Book Header / Accordion trigger */}
                         <button
+                          type="button"
                           onClick={() => {
                             setSelectedBookId(book.id);
+                            setChapterPageOpen(false);
                             // Auto select first chapter of selected book
                             if (book.chapters.length > 0) {
                               setSelectedChapterId(book.chapters[0].id);
                             }
                           }}
-                          className="w-full p-3 flex items-center justify-between text-left cursor-pointer group"
+                          className="w-full min-h-[44px] p-3 flex items-center justify-between text-left cursor-pointer group"
                         >
                           <span className={`font-serif text-sm font-semibold tracking-wide group-hover:text-[#d4af37] transition-colors ${isBookActive ? 'text-[#d4af37]' : 'text-[#b5aa9d]'}`}>
                             {book.title}
@@ -558,6 +720,11 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                                   <div className="flex-1 flex flex-col justify-center">
                                     <h4 className="font-serif font-bold text-sm text-[#f2edd9] line-clamp-1">{book.title}</h4>
                                     <p className="text-[10px] text-[#8a7b66] italic mt-0.5">by {book.author}</p>
+                                    <p className={`mt-1.5 text-[9px] font-sans font-semibold uppercase tracking-wider ${
+                                      book.chapters.length >= book.totalChapters ? 'text-[#85a378]' : 'text-[#c9a227]'
+                                    }`}>
+                                      {coverageLabel(book)}
+                                    </p>
 
                                     {/* Progress explored tracker */}
                                     <div className="mt-3.5 space-y-1">
@@ -812,7 +979,7 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                       <button
                         type="button"
                         onClick={() => setChapterPageOpen(true)}
-                        className="inline-flex items-center gap-2 bg-[#18392b] text-[#f2edd9] border border-[#d4af37]/45 px-5 py-2.5 rounded-sm text-[11px] font-bold uppercase tracking-widest shadow-md hover:bg-[#1f4a38] hover:border-[#d4af37] transition-colors"
+                        className="inline-flex items-center gap-2 min-h-[44px] bg-[#18392b] text-[#f2edd9] border border-[#d4af37]/45 px-5 py-2.5 rounded-sm text-[11px] font-bold uppercase tracking-widest shadow-md hover:bg-[#1f4a38] hover:border-[#d4af37] transition-colors"
                       >
                         <Layers className="w-4 h-4 text-[#d4af37]" />
                         Read Bit by Bit — Guided Study
@@ -1336,6 +1503,7 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                       whileHover={{ y: -6 }}
                       onClick={() => {
                         setSelectedBookId(book.id);
+                        setChapterPageOpen(false);
                         if (book.chapters.length > 0) {
                           setSelectedChapterId(book.chapters[0].id);
                         }
@@ -1365,6 +1533,11 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                         <div>
                           <h3 className="font-serif text-lg font-bold text-[#e3ddce] group-hover:text-[#d4af37] transition-colors leading-tight">{book.title}</h3>
                           <p className="font-sans text-[10px] text-[#8a7b66] italic mt-0.5">by Ellen G. White</p>
+                          <p className={`mt-1 text-[9px] font-semibold uppercase tracking-wider ${
+                            book.chapters.length >= book.totalChapters ? 'text-[#85a378]' : 'text-[#c9a227]'
+                          }`}>
+                            {coverageLabel(book)}
+                          </p>
                           <p className="font-sans text-xs text-[#a39a8c] mt-2 line-clamp-3 leading-relaxed">{book.description}</p>
                         </div>
 
@@ -1408,6 +1581,35 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
                 </h2>
                 <p className="font-sans text-sm text-[#8a7b66] max-w-lg mx-auto italic">Review and search all of your written study reflections across the entire spirit of prophecy guides.</p>
                 <FlourishDivider className="w-44 h-8" />
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExportBackup}
+                    className="min-h-[44px] inline-flex items-center gap-2 bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-5 rounded-xs text-xs font-semibold tracking-wider transition-all hover:border-[#d4af37]/40"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#d4af37]" aria-hidden="true" />
+                    Export all data
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => backupFileRef.current?.click()}
+                    className="min-h-[44px] inline-flex items-center gap-2 bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-5 rounded-xs text-xs font-semibold tracking-wider transition-all hover:border-[#d4af37]/40"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#d4af37]" aria-hidden="true" />
+                    Import backup
+                  </button>
+                  <input
+                    ref={backupFileRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    aria-label="Import backup JSON file"
+                    onChange={handleImportBackupFile}
+                  />
+                </div>
+                <p className="mt-2 font-sans text-[10px] text-[#5c5448] max-w-md mx-auto">
+                  Full backup includes notes, explored chapters, zoom, onboarding, and last-read. Import merges without deleting existing local keys.
+                </p>
               </div>
 
               {/* List of all notes in storage */}
@@ -1514,7 +1716,7 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={handleCopySummary}
-            className="bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:border-[#d4af37]/40 flex items-center gap-2 cursor-pointer shadow-md"
+            className="min-h-[44px] bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:border-[#d4af37]/40 flex items-center gap-2 cursor-pointer shadow-md"
           >
             <Copy className="w-3.5 h-3.5 text-[#d4af37]" />
             Copy Summary
@@ -1522,7 +1724,7 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
 
           <button
             onClick={handleExportNotes}
-            className="bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:border-[#d4af37]/40 flex items-center gap-2 cursor-pointer shadow-md"
+            className="min-h-[44px] bg-[#1c1917] hover:bg-[#201e1c] text-[#e3ddce] border border-[#3b3834] py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:border-[#d4af37]/40 flex items-center gap-2 cursor-pointer shadow-md"
           >
             <Download className="w-3.5 h-3.5 text-[#d4af37]" />
             Export Notes
@@ -1538,13 +1740,76 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
               }, 120);
               showToast('Chapter quiz opened on Study Desk.');
             }}
-            className="bg-[#2a241e] hover:bg-[#342c24] text-[#d4af37] border border-[#d4af37]/35 py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] flex items-center gap-2 cursor-pointer shadow-md"
+            className="min-h-[44px] bg-[#2a241e] hover:bg-[#342c24] text-[#d4af37] border border-[#d4af37]/35 py-2 px-6 rounded-xs text-xs font-semibold tracking-wider transition-all hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] flex items-center gap-2 cursor-pointer shadow-md"
           >
             <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
             Take Chapter Quiz
           </button>
         </div>
       </motion.footer>
+
+      <AnimatePresence>
+        {mobileChapterDrawerOpen && (
+          <motion.div
+            key="mobile-chapter-drawer"
+            className="fixed inset-0 z-[90] lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              type="button"
+              aria-label="Close chapter list"
+              className="absolute inset-0 bg-black/60"
+              onClick={() => setMobileChapterDrawerOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Chapter list"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="absolute bottom-0 left-0 right-0 max-h-[75vh] bg-[#141312] border-t border-[#3b3834] rounded-t-sm shadow-[0_-12px_40px_rgba(0,0,0,0.55)] p-4 pb-8"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-sans font-bold text-xs text-[#8a7b66] uppercase tracking-widest">
+                  {currentBook.title} — Chapters
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setMobileChapterDrawerOpen(false)}
+                  className="min-h-[44px] min-w-[44px] px-3 text-xs font-semibold uppercase tracking-wider text-[#a39a8c] hover:text-[#d4af37]"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="space-y-1 overflow-y-auto max-h-[55vh]">
+                {currentBook.chapters.map((ch) => (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedChapterId(ch.id);
+                      setMobileChapterDrawerOpen(false);
+                    }}
+                    className={`w-full text-left min-h-[44px] py-2.5 px-3 rounded-sm text-sm transition-colors border ${
+                      selectedChapterId === ch.id
+                        ? 'bg-[#2b241e]/55 text-[#d4af37] border-[#d4af37]/20 font-semibold'
+                        : 'text-[#a39a8c] hover:bg-[#201e1b] border-transparent'
+                    }`}
+                  >
+                    {ch.title}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {showOnboarding && <Onboarding onStart={handleOnboardingStart} />}
 
     </div>
   );
