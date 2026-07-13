@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QuizQuestion } from '../types';
 import { CheckCircle2, XCircle, BrainCircuit, ChevronRight, ChevronLeft, Trophy } from 'lucide-react';
 import { CornerAccents } from './Ornaments';
+import { scoreQuiz } from '../utils/quizScore';
+import { track } from '../utils/analytics';
 
 interface QuizCardProps {
   questions: QuizQuestion[];
@@ -13,15 +15,20 @@ export function QuizCard({ questions }: QuizCardProps) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [direction, setDirection] = useState(1);
+  const [trackedComplete, setTrackedComplete] = useState(false);
 
   const current = questions[currentIndex];
   const isAnswered = selectedOptionId !== null;
   const selectedOption = current?.options.find(o => o.id === selectedOptionId);
   const isComplete = currentIndex === questions.length - 1 && isAnswered;
-  const score = questions.filter(q => {
-    const pick = answers[q.id];
-    return q.options.find(o => o.id === pick)?.isCorrect;
-  }).length;
+  const score = scoreQuiz(questions, answers);
+
+  useEffect(() => {
+    if (isComplete && !trackedComplete) {
+      setTrackedComplete(true);
+      track('quiz_taken', `${score}-of-${questions.length}`);
+    }
+  }, [isComplete, trackedComplete, score, questions.length]);
 
   const handleSelect = (id: string) => {
     if (!isAnswered && current) {

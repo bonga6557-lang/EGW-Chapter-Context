@@ -7,7 +7,6 @@ import {
   Bookmark, Compass, Languages, Quote, Landmark, ZoomIn, ZoomOut, RotateCcw, Layers, List
 } from 'lucide-react';
 import type { User as AuthUser } from '@supabase/supabase-js';
-import { allBooks } from './data';
 import type { BookType } from './types';
 import { CornerAccents, FlourishDivider } from './components/Ornaments';
 import { QuizCard } from './components/QuizCard';
@@ -21,6 +20,9 @@ import { resolveHistoricalVerification, resolveScholarlyVerification, egwWriting
 import { SourceVerification, SourceVerificationNotice } from './components/SourceVerification';
 import { buildHash, hashesEqual, parseHash, type AppTab, type RouteState } from './router';
 import { downloadBackup, importBackupJson } from './utils/backup';
+import { searchBooks } from './utils/search';
+import { track } from './utils/analytics';
+import { loadAllBooks } from './data/loadBooks';
 import {
   getInitialSyncStatus,
   isMigrationDone,
@@ -75,6 +77,14 @@ function resolveInitialRoute(books: BookType[]): RouteState {
   };
 
   const apply = (partial: Partial<RouteState>): RouteState => {
+    if (books.length === 0) {
+      return {
+        bookId: partial.bookId || fallback.bookId,
+        chapterId: partial.chapterId || fallback.chapterId,
+        tab: partial.tab || 'study',
+        guided: !!partial.guided,
+      };
+    }
     const book = books.find((b) => b.id === partial.bookId) || books[0] || null;
     if (!book) return fallback;
     const chapter =
@@ -106,6 +116,20 @@ function resolveInitialRoute(books: BookType[]): RouteState {
 }
 
 function DustMotes() {
+  const [reduceMotion, setReduceMotion] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReduceMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  if (reduceMotion) return null;
+
   return (
     <div className="pointer-events-none fixed inset-0 z-[3] overflow-hidden" aria-hidden="true">
       {DUST_MOTES.map((m) => (
@@ -118,7 +142,6 @@ function DustMotes() {
             height: `${m.size}px`,
             filter: 'blur(0.4px)',
             boxShadow: '0 0 4px rgba(212,175,55,0.5)',
-            // Custom props consumed by the moteFloat keyframe
             ['--mote-drift' as string]: m.drift,
             ['--mote-opacity' as string]: m.opacity,
             animation: `moteFloat ${m.duration}s linear ${m.delay}s infinite`,
@@ -130,8 +153,9 @@ function DustMotes() {
 }
 
 export default function App() {
-  const books = allBooks;
-  const [routeSeed] = useState(() => resolveInitialRoute(books));
+  const [books, setBooks] = useState<BookType[]>([]);
+  const [booksReady, setBooksReady] = useState(false);
+  const [routeSeed] = useState(() => resolveInitialRoute([]));
   const [activeTab, setActiveTab] = useState<AppTab>(routeSeed.tab);
   const [selectedBookId, setSelectedBookId] = useState<string>(routeSeed.bookId);
   const [selectedChapterId, setSelectedChapterId] = useState<string>(routeSeed.chapterId);
@@ -197,13 +221,46 @@ export default function App() {
   const notesRef = useRef(savedNotes);
   const exploredRef = useRef(exploredChapters);
   const notePushTimer = useRef<number | undefined>(undefined);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
   notesRef.current = savedNotes;
   exploredRef.current = exploredChapters;
 
+  useEffect(() => {
+    let cancelled = false;
+    loadAllBooks()
+      .then((loaded) => {
+        if (cancelled) return;
+        setBooks(loaded);
+        const resolved = resolveInitialRoute(loaded);
+        setSelectedBookId(resolved.bookId);
+        setSelectedChapterId(resolved.chapterId);
+        setActiveTab(resolved.tab);
+        setChapterPageOpen(resolved.guided);
+        setBooksReady(true);
+      })
+      .catch((err) => {
+        console.error('[loadAllBooks]', err);
+        if (!cancelled) setBooksReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const currentBook = books.find(b => b.id === selectedBookId) || books[0];
   const currentChapter =
-    currentBook.chapters.find(c => c.id === selectedChapterId) ||
-    currentBook.chapters[0];
+    currentBook?.chapters.find(c => c.id === selectedChapterId) ||
+    currentBook?.chapters[0];
+
+  useEffect(() => {
+    if (!currentBook || !currentChapter) return;
+    document.title = `${currentChapter.title} · ${currentBook.title} · EGW Chapter Context`;
+  }, [currentBook?.id, currentChapter?.id, currentBook?.title, currentChapter?.title]);
+
+  useEffect(() => {
+    if (!currentBook || !currentChapter) return;
+    track('chapter_opened', `${currentBook.id}/${currentChapter.id}`);
+  }, [currentBook?.id, currentChapter?.id]);
 
   // Sync current chapter's notes
   useEffect(() => {
@@ -295,6 +352,7 @@ export default function App() {
     localStorage.setItem('egw-explored-chapters', JSON.stringify(newExplored));
     touchExploredTimestamp(chapterId);
     void pushExplored(chapterId, true);
+    track('guided_completed', chapterId);
     showToast('Guided read complete — chapter marked explored!');
   };
 
@@ -418,6 +476,7 @@ export default function App() {
   const handleExportBackup = () => {
     try {
       downloadBackup();
+      track('backup_exported');
       showToast('Full backup downloaded.');
     } catch {
       showToast('Could not export backup.');
@@ -499,25 +558,40 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    track('export_used', 'chapter-notes');
     showToast("Notes exported successfully!");
   };
 
-  // Search filter matching
-  const filteredSearch = searchQuery.trim().toLowerCase();
-  const searchResults = useMemo(() => books.flatMap(book =>
-    book.chapters.map(chapter => ({
-      book,
-      chapter,
-      matches:
-        book.title.toLowerCase().includes(filteredSearch) ||
-        chapter.title.toLowerCase().includes(filteredSearch) ||
-        (chapter.theme && chapter.theme.toLowerCase().includes(filteredSearch)) ||
-        chapter.bigIdea.toLowerCase().includes(filteredSearch)
-    }))
-  ).filter(item => filteredSearch && item.matches), [filteredSearch, books]);
+  // Search filter matching (deep: context, phrases, quotes, application)
+  const searchResults = useMemo(
+    () => searchBooks(books, searchQuery),
+    [books, searchQuery]
+  );
 
-  const totalExploredInBook = currentBook.chapters.filter(c => exploredChapters[c.id]).length;
-  const progressPercent = Math.round((totalExploredInBook / currentBook.chapters.length) * 100) || 0;
+  useEffect(() => {
+    if (!searchQuery) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSearchQuery('');
+    };
+    const onPointer = (e: MouseEvent) => {
+      if (!searchWrapRef.current?.contains(e.target as Node)) {
+        setSearchQuery('');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onPointer);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onPointer);
+    };
+  }, [searchQuery]);
+
+  const totalExploredInBook = currentBook
+    ? currentBook.chapters.filter(c => exploredChapters[c.id]).length
+    : 0;
+  const progressPercent = currentBook
+    ? Math.round((totalExploredInBook / currentBook.chapters.length) * 100) || 0
+    : 0;
 
   const getBookCoverStyles = (bookId: string) => {
     switch (bookId) {
@@ -585,6 +659,14 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
 
   const currentCover = getBookCoverStyles(selectedBookId);
 
+  if (!booksReady || !currentBook) {
+    return (
+      <div className="cinematic-bg min-h-screen text-[#e3ddce] flex items-center justify-center font-sans">
+        <p className="text-sm uppercase tracking-widest text-[#8a7b66]">Loading study library…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="cinematic-bg min-h-screen text-[#e3ddce] selection:bg-[#343029] selection:text-[#d4af37] flex flex-col overflow-x-hidden font-sans">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-[#18392b] focus:text-[#f2edd9] focus:px-4 focus:py-2 focus:rounded-sm focus:border focus:border-[#d4af37]/50">
@@ -642,49 +724,56 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
         </div>
 
         {/* Dynamic Search Box */}
-        <div className="relative flex-1 max-w-md w-full">
+        <div className="relative flex-1 max-w-md w-full" ref={searchWrapRef}>
           <div className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-[#8a7b66]">
             <Search className="w-4 h-4" />
           </div>
           <input
             type="search"
-            aria-label="Search books, chapters, and themes"
+            aria-label="Search books, chapters, context, and quotes"
             aria-expanded={!!searchQuery}
-            placeholder="Search books, chapters, themes..."
+            aria-controls="search-results"
+            placeholder="Search books, chapters, context, quotes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#1b1918] border border-[#3b3834] rounded-full pl-10 pr-4 py-2 text-sm text-[#e3ddce] placeholder-[#5c5448] focus:outline-none focus:border-[#d4af37]/60 focus:ring-1 focus:ring-[#d4af37]/20 transition-all font-sans"
+            className="w-full bg-[#1b1918] border border-[#3b3834] rounded-full pl-10 pr-4 py-2 text-sm text-[#e3ddce] placeholder-[#5c5448] focus:outline-none focus:border-[#d4af37]/60 focus:ring-2 focus:ring-[#d4af37]/35 transition-all font-sans"
           />
 
           {/* Search suggestions dropdown */}
           <AnimatePresence>
             {searchQuery && (
               <motion.div
+                id="search-results"
+                role="listbox"
+                aria-label="Search results"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
                 className="absolute left-0 right-0 mt-2 bg-[#141312] border border-[#3b3834] rounded shadow-2xl z-50 max-h-80 overflow-y-auto p-2 scrollbar-thin"
               >
                 {searchResults.length > 0 ? (
-                  searchResults.map(({ book, chapter }) => (
+                  searchResults.map(({ book, chapter, reason, snippet }) => (
                     <button
-                      key={chapter.id}
+                      key={`${book.id}-${chapter.id}-${reason}`}
+                      type="button"
+                      role="option"
                       onClick={() => {
                         openChapterOnDesk(book.id, chapter.id);
                         setSearchQuery('');
                       }}
-                      className="w-full text-left p-2.5 hover:bg-[#201e1b] rounded flex items-start gap-2.5 border-b border-[#201e1c]/40 last:border-0 transition-colors"
+                      className="w-full text-left p-2.5 min-h-[44px] hover:bg-[#201e1b] rounded flex items-start gap-2.5 border-b border-[#201e1c]/40 last:border-0 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/50"
                     >
                       <BookOpen className="w-4 h-4 text-[#d4af37] mt-1 flex-shrink-0" />
                       <div>
                         <div className="text-xs text-[#8a7b66] font-medium uppercase tracking-wider">{book.title}</div>
                         <div className="text-sm text-[#e3ddce] font-serif font-semibold">{chapter.title}</div>
-                        <div className="text-xs text-[#a39a8c] italic opacity-85 mt-0.5 line-clamp-1">{chapter.theme || chapter.bigIdea}</div>
+                        <div className="text-[10px] text-[#d4af37] uppercase tracking-wider mt-1">{reason}</div>
+                        <div className="text-xs text-[#a39a8c] italic opacity-85 mt-0.5 line-clamp-2">{snippet}</div>
                       </div>
                     </button>
                   ))
                 ) : (
-                  <div className="p-4 text-center text-sm text-[#5c5448] font-sans">No matching chapters or themes found</div>
+                  <div className="p-4 text-center text-sm text-[#5c5448] font-sans">No matching chapters found</div>
                 )}
               </motion.div>
             )}
@@ -1820,7 +1909,7 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
       </main>
 
       {/* CONTENT STANDARDS DISCLAIMER */}
-      <div className="relative z-30 border-t border-[#1a1817] bg-[#141312] px-6 py-4">
+      <div className="relative z-30 border-t border-[#1a1817] bg-[#141312] px-6 py-4 space-y-2">
         <p className="max-w-4xl mx-auto text-[11px] leading-relaxed text-[#8a7b66] text-center">
           <strong className="text-[#b5aa9d]">Independent study companion.</strong> This app is not
           affiliated with or endorsed by the Ellen G. White Estate or the Seventh-day Adventist
@@ -1828,8 +1917,16 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
           quizzes — is companion material, not inspired writing, and has not yet undergone formal
           theological review. Quotations are individually labeled by verification status; always
           read Ellen White&rsquo;s own words at{' '}
-          <a href="https://egwwritings.org" target="_blank" rel="noopener noreferrer" className="text-[#d4af37] hover:underline">egwwritings.org</a>{' '}
+          <a href="https://egwwritings.org" target="_blank" rel="noopener noreferrer" className="text-[#d4af37] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d4af37]">egwwritings.org</a>{' '}
           and verify sources before teaching or citing.
+        </p>
+        <p className="text-center text-[11px]">
+          <a
+            href="mailto:bn638260@gmail.com?subject=EGW%20Chapter%20Context%20feedback"
+            className="text-[#d4af37] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#d4af37]"
+          >
+            Send feedback
+          </a>
         </p>
       </div>
 

@@ -22,8 +22,10 @@ function ArchivalImage({ src, alt }: { src: string; alt: string }) {
     <img
       src={src}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       onError={() => setFailed(true)}
-      className="w-full h-72 object-cover rounded-xs sepia grayscale-[10%] brightness-95 group-hover:scale-105 group-hover:brightness-100 transition-all duration-500"
+      className="w-full h-72 object-cover rounded-xs sepia grayscale-[10%] brightness-95 group-hover:scale-105 group-hover:brightness-100 transition-all duration-500 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
     />
   );
 }

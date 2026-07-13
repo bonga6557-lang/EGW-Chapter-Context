@@ -233,11 +233,39 @@ a:focus:not(:focus-visible) {
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
 }
 
-/* Respect reduced motion */
+/* Respect reduced motion — kill decorative animation & nonessential transforms */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
+
+  .shimmer-text,
+  .breath-glow {
+    animation: none !important;
+    background: none !important;
+    color: #d4af37 !important;
+    -webkit-text-fill-color: #d4af37 !important;
+  }
+}
+
+/* Visible focus rings on the dark theme */
+:focus-visible {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Parchment body contrast assist */
+.parchment-tex {
+  color: #1f1c18;
 }

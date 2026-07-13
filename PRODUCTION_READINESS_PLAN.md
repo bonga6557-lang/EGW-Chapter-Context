@@ -231,7 +231,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 2 · Accounts & sync — rubric B5(full); D2 partially DEFERRED
 
-**Status:** `[ DONE — awaiting operator sign-off ]` · **Depends:** Phase 1
+**Status:** `[ DONE — signed off 2026-07-13 ]` · **Depends:** Phase 1
 
 ```
 DECISIONS RESOLVED (operator, 2026-07-13):
@@ -271,7 +271,7 @@ DECISIONS RESOLVED (operator, 2026-07-13):
 
 ### ◆ PHASE P · Performance, polish, tests, analytics — rubric A4, A6, A7, A8, B6, D4, D5
 
-**Status:** `[ PENDING ]` · **Depends:** Phase 1 (can interleave with Phase 2)
+**Status:** `[ DONE — awaiting operator sign-off ]` · **Depends:** Phase 1 (can interleave with Phase 2)
 
 #### Mission
 1. **Code-split per book (A7):** `src/data.ts` moves to dynamic `import()` per book;
@@ -295,9 +295,9 @@ DECISIONS RESOLVED (operator, 2026-07-13):
    feedback link in the footer.
 
 #### Phase proof bar
-- [ ] Bundle size table before/after code-splitting.
-- [ ] Lighthouse mobile report ≥ 85 pasted.
-- [ ] Full vitest output, 0 failures, with the listed flows covered.
+- [x] Bundle size table before/after code-splitting. → `plans/PHASE-P-EXECUTION.md` CP-04
+- [ ] Lighthouse mobile report ≥ 85 pasted. *(operator)*
+- [x] Full vitest output, 0 failures, with the listed flows covered. → 9 tests passing
 
 ---
 
@@ -422,7 +422,8 @@ per template). This master file keeps only the roll-up below.
 ```
 [ M.1 — 2026-07-13 — Phase 0 completed (signed off) — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
 [ M.2 — 2026-07-13 — Phase 1 completed (signed off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
-[ M.3 — 2026-07-13 — Phase 2 completed (awaiting operator sign-off) — link: plans/PHASE-2-EXECUTION.md — commit: 9ec6c4f ]
+[ M.3 — 2026-07-13 — Phase 2 completed (signed off) — link: plans/PHASE-2-EXECUTION.md — commit: 9ec6c4f ]
+[ M.4 — 2026-07-13 — Phase P completed (awaiting operator sign-off) — link: plans/PHASE-P-EXECUTION.md — commit: pending ]
 ```
 
 ---
@@ -447,8 +448,8 @@ Template HS-1 … HS-10 apply verbatim. Master-plan additions:
 |---|---|---|---|
 | Phase 0 — Repo & build | D1 | `[x] signed off` | plans/PHASE-0-EXECUTION.md |
 | Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[x] signed off` | plans/PHASE-1-EXECUTION.md |
-| Phase 2 — Accounts & sync | B5 D2(partial) | `[x] awaiting sign-off` | plans/PHASE-2-EXECUTION.md |
-| Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[ ]` | plans/PHASE-P-EXECUTION.md |
+| Phase 2 — Accounts & sync | B5 D2(partial) | `[x] signed off` | plans/PHASE-2-EXECUTION.md |
+| Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[x] awaiting sign-off` | plans/PHASE-P-EXECUTION.md |
 | Phase C — Content & trust | C1 C2 C4 | `[ ]` | phase §6 audit tables |
 | Phase V — Business gates | C3 C5 C7 C8 | `[ ]` | docs/RIGHTS_REVIEW.md · docs/PRICING.md |
 | Final gate — Rubric scoring | all | `[ ]` | PRODUCTION_READINESS_RUBRIC.md scores |
