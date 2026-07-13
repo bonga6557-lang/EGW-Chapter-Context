@@ -178,7 +178,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 0 · Repo hygiene & reproducible build — rubric D1
 
-**Status:** `[ PENDING ]` · **Blocks:** all other phases
+**Status:** `[ DONE — awaiting operator sign-off ]` · **Blocks:** all other phases
 
 #### Mission
 1. `git init`, first commit of current state (the safety net every later phase's
@@ -192,8 +192,8 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
    (log them as pre-existing failures per CP-02 Phase C rules).
 
 #### Phase proof bar (in addition to template CP proofs)
-- [ ] Paste of successful clean-clone `npm ci && npm run build` output.
-- [ ] `git log --oneline` showing baseline commit + phase commits.
+- [x] Paste of successful clean-clone `npm ci && npm run build` output. → `plans/PHASE-0-EXECUTION.md` CP-04
+- [x] `git log --oneline` showing baseline commit + phase commits. → same
 
 ---
 
@@ -418,7 +418,7 @@ per template). This master file keeps only the roll-up below.
 ### Master roll-up (append-only)
 
 ```
-[ M.1 — <date> — Phase 0 completed — link: plans/PHASE-0-EXECUTION.md — commit: <sha> ]
+[ M.1 — 2026-07-13 — Phase 0 completed (awaiting operator sign-off) — link: plans/PHASE-0-EXECUTION.md — commit: pending close-out ]
 [ M.2 — ... ]
 ```
 
@@ -442,7 +442,7 @@ Template HS-1 … HS-10 apply verbatim. Master-plan additions:
 
 | Phase | Rubric criteria | Status | Proof location |
 |---|---|---|---|
-| Phase 0 — Repo & build | D1 | `[ ]` | plans/PHASE-0-EXECUTION.md |
+| Phase 0 — Repo & build | D1 | `[x] awaiting sign-off` | plans/PHASE-0-EXECUTION.md |
 | Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[ ]` | plans/PHASE-1-EXECUTION.md |
 | Phase 2 — Accounts & sync | B5 D2(partial) | `[ ]` | plans/PHASE-2-EXECUTION.md |
 | Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[ ]` | plans/PHASE-P-EXECUTION.md |
