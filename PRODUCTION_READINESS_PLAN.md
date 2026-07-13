@@ -420,7 +420,7 @@ per template). This master file keeps only the roll-up below.
 
 ```
 [ M.1 — 2026-07-13 — Phase 0 completed (signed off) — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
-[ M.2 — 2026-07-13 — Phase 1 completed (awaiting operator sign-off) — link: plans/PHASE-1-EXECUTION.md — commit: pending ]
+[ M.2 — 2026-07-13 — Phase 1 completed (awaiting operator sign-off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
 ```
 
 ---
