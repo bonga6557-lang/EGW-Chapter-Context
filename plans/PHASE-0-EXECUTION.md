@@ -76,7 +76,7 @@ Auth account: BongaNdlovu (collaborator on bonga6557-lang/EGW-Chapter-Context)
 a7782c0 Plan: defer payments (Stripe unavailable in South Africa), record repo + Supabase setup
 b47050d Initial commit: EGW Chapter Context study companion
 ```
-(+ Phase 0 close-out commit after this report is committed)
+(+ Phase 0 close-out commit `584bf2c`)
 
 ---
 
