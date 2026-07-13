@@ -178,7 +178,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 0 · Repo hygiene & reproducible build — rubric D1
 
-**Status:** `[ DONE — signed off 2026-07-13 ]` · **Blocks:** all other phases
+**Status:** `[ DONE - local proof passed; operator sign-off field pending ]` · **Blocks:** all other phases
 
 #### Mission
 1. `git init`, first commit of current state (the safety net every later phase's
@@ -199,7 +199,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 1 · Flow foundations — rubric B1, B3, B5(min), A2, D3
 
-**Status:** `[ DONE — signed off 2026-07-13 ]` · **Depends:** Phase 0
+**Status:** `[ DONE - automated proof passed; manual operator evidence pending ]` · **Depends:** Phase 0
 
 #### Mission (each item = one or more CHANGE N blocks in this phase's CP-02)
 1. **URL routing (B3):** hash-based router reflecting `#/book/:bookId/chapter/:chapterId`
@@ -231,7 +231,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 2 · Accounts & sync — rubric B5(full); D2 partially DEFERRED
 
-**Status:** `[ DONE — signed off 2026-07-13 ]` · **Depends:** Phase 1
+**Status:** `[ DONE - local implementation proof passed; live Supabase E2E/RLS proof pending ]` · **Depends:** Phase 1
 
 ```
 DECISIONS RESOLVED (operator, 2026-07-13):
@@ -271,7 +271,7 @@ DECISIONS RESOLVED (operator, 2026-07-13):
 
 ### ◆ PHASE P · Performance, polish, tests, analytics — rubric A4, A6, A7, A8, B6, D4, D5
 
-**Status:** `[ DONE — awaiting operator sign-off ]` · **Depends:** Phase 1 (can interleave with Phase 2)
+**Status:** `[ DONE - local proof passed; Lighthouse/operator sign-off pending ]` · **Depends:** Phase 1 (can interleave with Phase 2)
 
 #### Mission
 1. **Code-split per book (A7):** `src/data.ts` moves to dynamic `import()` per book;
@@ -297,13 +297,13 @@ DECISIONS RESOLVED (operator, 2026-07-13):
 #### Phase proof bar
 - [x] Bundle size table before/after code-splitting. → `plans/PHASE-P-EXECUTION.md` CP-04
 - [ ] Lighthouse mobile report ≥ 85 pasted. *(operator)*
-- [x] Full vitest output, 0 failures, with the listed flows covered. → 9 tests passing
+- [x] Full vitest output, 0 failures, with the listed flows covered. → 12 tests passing after remediation
 
 ---
 
 ### ◆ PHASE C · Content completion & trust — rubric C1, C2, C4 (NOT a coding-agent phase)
 
-**Status:** `[ PENDING ]` · **Runs in parallel from day 1** · **Tooling:** `verified-research` skill only
+**Status:** `[ PARTIAL - loaded-content metadata audit passes; verified-research content work still pending ]` · **Runs in parallel from day 1** · **Tooling:** `verified-research` skill only
 
 #### Mission
 1. **v1 repositioning (unblocks launch):** in-app labeling of Desire of Ages, Prophets &
@@ -330,7 +330,7 @@ DECISIONS RESOLVED (operator, 2026-07-13):
 
 ### ◆ PHASE V · Business gates — rubric C3, C5, C7, C8 (OPERATOR-ONLY)
 
-**Status:** `[ PENDING ]` · **Runs in parallel; hard-gates launch**
+**Status:** `[ DRAFTS CREATED - operator/legal/interview evidence pending ]` · **Runs in parallel; hard-gates launch**
 
 #### Mission
 1. **Rights review (C7 — HARD GATE):** written confirmation in docs/RIGHTS_REVIEW.md:
@@ -420,10 +420,11 @@ per template). This master file keeps only the roll-up below.
 ### Master roll-up (append-only)
 
 ```
-[ M.1 — 2026-07-13 — Phase 0 completed (signed off) — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
-[ M.2 — 2026-07-13 — Phase 1 completed (signed off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
-[ M.3 — 2026-07-13 — Phase 2 completed (signed off) — link: plans/PHASE-2-EXECUTION.md — commit: 9ec6c4f ]
-[ M.4 — 2026-07-13 — Phase P completed (awaiting operator sign-off) — link: plans/PHASE-P-EXECUTION.md — commit: d9dadc1 ]
+[ M.1 — 2026-07-13 — Phase 0 local proof completed; operator field still pending — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
+[ M.2 — 2026-07-13 — Phase 1 automated proof completed; manual operator evidence still pending — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
+[ M.3 — 2026-07-13 — Phase 2 local implementation proof completed; live E2E/RLS evidence still pending — link: plans/PHASE-2-EXECUTION.md — commit: 9ec6c4f ]
+[ M.4 — 2026-07-13 — Phase P local proof completed; Lighthouse/operator sign-off still pending — link: plans/PHASE-P-EXECUTION.md — commit: d9dadc1 ]
+[ M.5 — 2026-07-13 — Gap remediation: pinned deps, CI, analytics loader, loaded-content source audit, rights/pricing gate docs — link: docs/READINESS_GATES.md — commit: pending ]
 ```
 
 ---
@@ -446,15 +447,15 @@ Template HS-1 … HS-10 apply verbatim. Master-plan additions:
 
 | Phase | Rubric criteria | Status | Proof location |
 |---|---|---|---|
-| Phase 0 — Repo & build | D1 | `[x] signed off` | plans/PHASE-0-EXECUTION.md |
-| Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[x] signed off` | plans/PHASE-1-EXECUTION.md |
-| Phase 2 — Accounts & sync | B5 D2(partial) | `[x] signed off` | plans/PHASE-2-EXECUTION.md |
-| Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[x] awaiting sign-off` | plans/PHASE-P-EXECUTION.md |
-| Phase C — Content & trust | C1 C2 C4 | `[ ]` | phase §6 audit tables |
-| Phase V — Business gates | C3 C5 C7 C8 | `[ ]` | docs/RIGHTS_REVIEW.md · docs/PRICING.md |
+| Phase 0 — Repo & build | D1 | `[x] local proof passed; operator field pending` | plans/PHASE-0-EXECUTION.md |
+| Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[x] automated proof passed; manual operator evidence pending` | plans/PHASE-1-EXECUTION.md |
+| Phase 2 — Accounts & sync | B5 D2(partial) | `[x] local implementation proof passed; live E2E/RLS pending` | plans/PHASE-2-EXECUTION.md |
+| Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[x] local proof passed; Lighthouse/sign-off pending` | plans/PHASE-P-EXECUTION.md |
+| Phase C — Content & trust | C1 C2 C4 | `[~] loaded-content metadata audit passes; verified-research content audit pending` | tests/contentVerification.test.ts |
+| Phase V — Business gates | C3 C5 C7 C8 | `[~] drafts created; unsigned and interview evidence pending` | docs/RIGHTS_REVIEW.md · docs/PRICING.md |
 | Final gate — Rubric scoring | all | `[ ]` | PRODUCTION_READINESS_RUBRIC.md scores |
 
-**Launch verdict:** `[ 🟢 / 🟡 / 🔴 ]` · **Operator final sign-off:** `[ NAME · DATE ]`
+**Launch verdict:** `[ 🔴 not ready to charge - operator/legal/live evidence pending ]` · **Operator final sign-off:** `[ NAME · DATE ]`
 
 ---
 

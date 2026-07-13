@@ -1,7 +1,7 @@
 # PHASE 0 EXECUTION — Repo hygiene & reproducible build
 ### Plan: EGW-PROD-READY-2026 · Rubric: D1 · Agent session: 2026-07-13
 
-**Status:** `DONE — awaiting operator sign-off`  
+**Status:** `DONE — local proof passed; operator field pending`
 **Depends:** none  
 **Blocks:** Phase 1, 2, P
 

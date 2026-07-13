@@ -1,4 +1,5 @@
 import type { BookType } from '../types';
+import { normalizeBook } from './normalizeBooks';
 
 const BOOK_LOADERS = [
   () => import('./book-steps-to-christ'),
@@ -12,7 +13,7 @@ const BOOK_LOADERS = [
 /** Dynamic per-book imports — each book becomes its own JS chunk. */
 export async function loadAllBooks(): Promise<BookType[]> {
   const modules = await Promise.all(BOOK_LOADERS.map((load) => load()));
-  return modules.map((m) => m.book);
+  return modules.map((m) => normalizeBook(m.book));
 }
 
 export async function loadBookById(bookId: string): Promise<BookType | null> {

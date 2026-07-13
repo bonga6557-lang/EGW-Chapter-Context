@@ -2,7 +2,7 @@
 ### Plan: EGW-PROD-READY-2026 · Rubric: B5(full); D2 partial (auth+sync; payments deferred)
 ### Agent session: 2026-07-13 · Depends: Phase 1 signed off
 
-**Status:** `DONE — awaiting operator sign-off`  
+**Status:** `DONE — local implementation proof passed; live Supabase E2E/RLS proof pending`
 **Payments:** DEFERRED (2b) — no Stripe/paywall code.
 
 ---

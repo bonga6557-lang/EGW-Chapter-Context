@@ -2,7 +2,7 @@
 ### Plan: EGW-PROD-READY-2026 · Rubric: B1, B3, B5(min), A2, D3 (+C1 labeling)
 ### Agent session: 2026-07-13 · Depends: Phase 0 signed off
 
-**Status:** `DONE — awaiting operator sign-off`
+**Status:** `DONE — automated proof passed; manual operator evidence pending`
 
 ---
 
