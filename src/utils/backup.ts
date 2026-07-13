@@ -5,6 +5,8 @@ export const APP_STORAGE_KEYS = [
   'egw-saved-notes',
   'egw-onboarding-done',
   'egw-last-read',
+  'egw-sync-timestamps',
+  'egw-sync-conflicts',
 ] as const;
 
 export type AppStorageKey = (typeof APP_STORAGE_KEYS)[number];
@@ -84,6 +86,39 @@ function mergeJsonMaps(existingRaw: string | null, incomingRaw: string): string 
   return JSON.stringify({ ...existing, ...incoming });
 }
 
+function mergeSyncTimestamps(existingRaw: string | null, incomingRaw: string): string {
+  const empty = { notes: {}, explored: {} };
+  let existing = empty;
+  let incoming = empty;
+  try {
+    if (existingRaw) {
+      const parsed = JSON.parse(existingRaw);
+      if (isPlainObject(parsed)) {
+        existing = {
+          notes: isPlainObject(parsed.notes) ? (parsed.notes as Record<string, string>) : {},
+          explored: isPlainObject(parsed.explored) ? (parsed.explored as Record<string, string>) : {},
+        };
+      }
+    }
+  } catch {
+    existing = empty;
+  }
+  try {
+    const parsed = JSON.parse(incomingRaw);
+    if (!isPlainObject(parsed)) throw new Error('not an object');
+    incoming = {
+      notes: isPlainObject(parsed.notes) ? (parsed.notes as Record<string, string>) : {},
+      explored: isPlainObject(parsed.explored) ? (parsed.explored as Record<string, string>) : {},
+    };
+  } catch {
+    throw new Error('Invalid sync timestamps in backup');
+  }
+  return JSON.stringify({
+    notes: { ...existing.notes, ...incoming.notes },
+    explored: { ...existing.explored, ...incoming.explored },
+  });
+}
+
 /**
  * Non-destructive import: merges notes/explored maps; writes scalar keys only when present in backup.
  * Never removes keys that exist locally but are absent from the file.
@@ -123,6 +158,9 @@ export function importBackupJson(jsonText: string): ImportResult {
       if (key === 'egw-explored-chapters' || key === 'egw-saved-notes') {
         const existing = localStorage.getItem(key);
         localStorage.setItem(key, mergeJsonMaps(existing, incoming));
+      } else if (key === 'egw-sync-timestamps') {
+        const existing = localStorage.getItem(key);
+        localStorage.setItem(key, mergeSyncTimestamps(existing, incoming));
       } else {
         localStorage.setItem(key, incoming);
       }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, ChangeEvent, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, ChangeEvent, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   BookOpen, Search, BookMarked, Lightbulb, Link as LinkIcon,
@@ -6,6 +6,7 @@ import {
   ChevronRight, HelpCircle, Archive, ClipboardList, CheckCircle2,
   Bookmark, Compass, Languages, Quote, Landmark, ZoomIn, ZoomOut, RotateCcw, Layers, List
 } from 'lucide-react';
+import type { User as AuthUser } from '@supabase/supabase-js';
 import { allBooks } from './data';
 import type { BookType } from './types';
 import { CornerAccents, FlourishDivider } from './components/Ornaments';
@@ -14,11 +15,25 @@ import { LibraryProgressChart } from './components/LibraryProgressChart';
 import { CulturalHistory } from './components/CulturalHistory';
 import { ChapterDetail } from './components/ChapterDetail';
 import { Onboarding } from './components/Onboarding';
+import { Account } from './components/Account';
 import { splitVerseEntry, bibleGatewayUrl } from './utils/bibleLink';
 import { resolveHistoricalVerification, resolveScholarlyVerification, egwWritingsUrl } from './utils/sourceVerification';
 import { SourceVerification, SourceVerificationNotice } from './components/SourceVerification';
 import { buildHash, hashesEqual, parseHash, type AppTab, type RouteState } from './router';
 import { downloadBackup, importBackupJson } from './utils/backup';
+import {
+  getInitialSyncStatus,
+  isMigrationDone,
+  markMigrationDone,
+  pullAndMerge,
+  pushExplored,
+  pushLocalWins,
+  pushNote,
+  touchExploredTimestamp,
+  touchNoteTimestamp,
+  uploadLocalState,
+  type SyncStatus,
+} from './lib/sync';
 
 // Deterministic dust-mote field so layout is stable across renders.
 const DUST_MOTES = Array.from({ length: 26 }, (_, i) => {
@@ -137,6 +152,11 @@ export default function App() {
   const toastTimer = useRef<number | undefined>(undefined);
   const applyingHash = useRef(false);
   const backupFileRef = useRef<HTMLInputElement>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => getInitialSyncStatus());
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [showMigration, setShowMigration] = useState(false);
   const [readingZoom, setReadingZoom] = useState(() => {
     try {
       const saved = localStorage.getItem(READING_ZOOM_KEY);
@@ -173,6 +193,12 @@ export default function App() {
       return {};
     }
   });
+
+  const notesRef = useRef(savedNotes);
+  const exploredRef = useRef(exploredChapters);
+  const notePushTimer = useRef<number | undefined>(undefined);
+  notesRef.current = savedNotes;
+  exploredRef.current = exploredChapters;
 
   const currentBook = books.find(b => b.id === selectedBookId) || books[0];
   const currentChapter =
@@ -267,6 +293,8 @@ export default function App() {
     const newExplored = { ...exploredChapters, [chapterId]: true };
     setExploredChapters(newExplored);
     localStorage.setItem('egw-explored-chapters', JSON.stringify(newExplored));
+    touchExploredTimestamp(chapterId);
+    void pushExplored(chapterId, true);
     showToast('Guided read complete — chapter marked explored!');
   };
 
@@ -277,12 +305,19 @@ export default function App() {
     const newNotes = { ...savedNotes, [key]: val };
     setSavedNotes(newNotes);
     localStorage.setItem('egw-saved-notes', JSON.stringify(newNotes));
+    touchNoteTimestamp(key);
+    if (notePushTimer.current) window.clearTimeout(notePushTimer.current);
+    notePushTimer.current = window.setTimeout(() => {
+      void pushNote(key, val);
+    }, 600);
   };
 
   const handleToggleExplored = (chapterId: string) => {
     const newExplored = { ...exploredChapters, [chapterId]: !exploredChapters[chapterId] };
     setExploredChapters(newExplored);
     localStorage.setItem('egw-explored-chapters', JSON.stringify(newExplored));
+    touchExploredTimestamp(chapterId);
+    void pushExplored(chapterId, !!newExplored[chapterId]);
     showToast(newExplored[chapterId] ? "Chapter marked as explored!" : "Chapter marked unexplored");
   };
 
@@ -290,6 +325,94 @@ export default function App() {
     setToastMessage(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const hasLocalStudyData = useCallback(() => {
+    const notes = notesRef.current;
+    const explored = exploredRef.current;
+    const hasNotes = Object.values(notes).some((v) => !!v?.trim());
+    const exploredCount = Object.values(explored).filter(Boolean).length;
+    return hasNotes || exploredCount > 1;
+  }, []);
+
+  const runCloudSync = useCallback(async () => {
+    if (!authUser) {
+      setSyncStatus(getInitialSyncStatus());
+      return;
+    }
+    setSyncStatus('syncing');
+    setSyncError(null);
+    const pull = await pullAndMerge(notesRef.current, exploredRef.current);
+    if (pull.ok === false) {
+      setSyncStatus('error');
+      setSyncError(pull.error);
+      showToast(pull.error);
+      return;
+    }
+
+    setSavedNotes(pull.result.notes);
+    setExploredChapters(pull.result.explored);
+    await pushLocalWins(pull.result.notes, pull.result.explored, pull.result.conflicts);
+
+    const needsMigrationPrompt =
+      pull.result.remoteEmpty &&
+      hasLocalStudyData() &&
+      !isMigrationDone(authUser.id);
+
+    if (needsMigrationPrompt) {
+      setShowMigration(true);
+      setLastSyncAt(new Date().toISOString());
+      setSyncStatus('synced');
+      return;
+    }
+
+    const upload = await uploadLocalState(pull.result.notes, pull.result.explored);
+    if (!upload.ok) {
+      setSyncStatus('error');
+      setSyncError(upload.error || 'Upload failed');
+      showToast(upload.error || 'Upload failed');
+      return;
+    }
+
+    markMigrationDone(authUser.id);
+    setLastSyncAt(new Date().toISOString());
+    setSyncStatus('synced');
+  }, [authUser, hasLocalStudyData]);
+
+  const handleAuthUserChange = useCallback((user: AuthUser | null) => {
+    setAuthUser(user);
+    if (!user) {
+      setSyncStatus(getInitialSyncStatus());
+      setShowMigration(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) return;
+    void runCloudSync();
+  }, [authUser, runCloudSync]);
+
+  const handleMigrationConfirm = async () => {
+    if (!authUser) return;
+    setSyncStatus('syncing');
+    const upload = await uploadLocalState(notesRef.current, exploredRef.current);
+    if (!upload.ok) {
+      setSyncStatus('error');
+      setSyncError(upload.error || 'Migration failed');
+      showToast(upload.error || 'Migration failed');
+      return;
+    }
+    markMigrationDone(authUser.id);
+    setShowMigration(false);
+    setLastSyncAt(new Date().toISOString());
+    setSyncStatus('synced');
+    showToast('Local study data uploaded to your account.');
+  };
+
+  const handleMigrationSkip = () => {
+    if (authUser) markMigrationDone(authUser.id);
+    setShowMigration(false);
+    showToast('Kept local data on this device only.');
   };
 
   const handleExportBackup = () => {
@@ -568,24 +691,34 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
           </AnimatePresence>
         </div>
 
-        {/* Tab Buttons (Victorian library panels) */}
-        <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-1.5 bg-[#1b1918] p-1 border border-[#3b3834] rounded tab-scroll overflow-x-auto max-w-full shrink-0">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-current={active ? 'page' : undefined}
-                onClick={() => setActiveTab(t.id)}
-                className={`relative px-3 sm:px-4 py-1.5 text-[10px] sm:text-xs font-semibold uppercase tracking-widest transition-all rounded-sm flex items-center gap-1.5 whitespace-nowrap shrink-0 ${active ? t.cls + ' border' : 'text-[#8a7b66] hover:text-[#e3ddce] border border-transparent'}`}
-              >
-                <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {t.label}
-              </button>
-            );
-          })}
-        </nav>
+        {/* Tab Buttons (Victorian library panels) + Account */}
+        <div className="flex items-center gap-2 shrink-0">
+          <nav aria-label="Main navigation" className="flex items-center gap-1 sm:gap-1.5 bg-[#1b1918] p-1 border border-[#3b3834] rounded tab-scroll overflow-x-auto max-w-full">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              const active = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setActiveTab(t.id)}
+                  className={`relative px-3 sm:px-4 py-1.5 text-[10px] sm:text-xs font-semibold uppercase tracking-widest transition-all rounded-sm flex items-center gap-1.5 whitespace-nowrap shrink-0 ${active ? t.cls + ' border' : 'text-[#8a7b66] hover:text-[#e3ddce] border border-transparent'}`}
+                >
+                  <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {t.label}
+                </button>
+              );
+            })}
+          </nav>
+          <Account
+            syncStatus={syncStatus}
+            lastSyncAt={lastSyncAt}
+            syncError={syncError}
+            onUserChange={handleAuthUserChange}
+            onRequestSync={() => { void runCloudSync(); }}
+            onToast={showToast}
+          />
+        </div>
       </motion.header>
 
       {/* WORKSPACE AREA */}
@@ -1810,6 +1943,52 @@ ${(currentChapter.discussionQuestions || []).map((q, i) => `Q${i + 1}: ${q}\n`).
       </AnimatePresence>
 
       {showOnboarding && <Onboarding onStart={handleOnboardingStart} />}
+
+      <AnimatePresence>
+        {showMigration && (
+          <motion.div
+            className="fixed inset-0 z-[96] flex items-center justify-center px-4 py-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="absolute inset-0 bg-black/65" />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="migration-title"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="relative w-full max-w-md border border-[#ded5be]/40 bg-[#f3eedb] text-[#24221f] rounded-sm shadow-[0_25px_60px_rgba(0,0,0,0.55)] p-6 sm:p-7"
+            >
+              <h2 id="migration-title" className="font-serif text-2xl font-bold text-[#2b251e] mb-2">
+                Upload local study data?
+              </h2>
+              <p className="font-sans text-sm text-[#5c5448] leading-relaxed mb-5">
+                This account has no cloud notes yet. You can upload the notes and explored chapters
+                already on this device. Nothing on this device will be deleted either way.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={() => { void handleMigrationConfirm(); }}
+                  className="min-h-[44px] flex-1 px-4 py-2.5 bg-[#18392b] text-[#f2edd9] border border-[#d4af37]/45 text-xs font-bold uppercase tracking-widest rounded-sm hover:bg-[#1f4a38] transition-colors"
+                >
+                  Upload to account
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMigrationSkip}
+                  className="min-h-[44px] flex-1 px-4 py-2.5 bg-transparent text-[#2b251e] border border-[#8a7b66]/50 text-xs font-bold uppercase tracking-widest rounded-sm hover:border-[#2b251e] transition-colors"
+                >
+                  Not now
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

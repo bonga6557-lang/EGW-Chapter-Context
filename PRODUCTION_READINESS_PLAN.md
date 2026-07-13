@@ -199,7 +199,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 1 · Flow foundations — rubric B1, B3, B5(min), A2, D3
 
-**Status:** `[ DONE — awaiting operator sign-off ]` · **Depends:** Phase 0
+**Status:** `[ DONE — signed off 2026-07-13 ]` · **Depends:** Phase 0
 
 #### Mission (each item = one or more CHANGE N blocks in this phase's CP-02)
 1. **URL routing (B3):** hash-based router reflecting `#/book/:bookId/chapter/:chapterId`
@@ -231,7 +231,7 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ### ◆ PHASE 2 · Accounts & sync — rubric B5(full); D2 partially DEFERRED
 
-**Status:** `[ PENDING ]` · **Depends:** Phase 1
+**Status:** `[ DONE — awaiting operator sign-off ]` · **Depends:** Phase 1
 
 ```
 DECISIONS RESOLVED (operator, 2026-07-13):
@@ -261,10 +261,11 @@ DECISIONS RESOLVED (operator, 2026-07-13):
    in the free bundle.
 
 #### Phase proof bar
+- [x] Secrets audit: no service_role/secret keys in client bundle (see `plans/PHASE-2-EXECUTION.md` CP-04).
 - [ ] End-to-end evidence: sign up on device A → note written on A appears on
-      device B. Screenshots + logs.
+      device B. Screenshots + logs. *(operator — after applying migration)*
 - [ ] RLS test evidence: user A cannot read user B's rows (SQL test output pasted).
-- [ ] Secrets audit: no keys in client bundle beyond the publishable key.
+      *(operator — `scripts/phase2-rls-check.sql`)*
 
 ---
 
@@ -420,7 +421,8 @@ per template). This master file keeps only the roll-up below.
 
 ```
 [ M.1 — 2026-07-13 — Phase 0 completed (signed off) — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
-[ M.2 — 2026-07-13 — Phase 1 completed (awaiting operator sign-off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
+[ M.2 — 2026-07-13 — Phase 1 completed (signed off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
+[ M.3 — 2026-07-13 — Phase 2 completed (awaiting operator sign-off) — link: plans/PHASE-2-EXECUTION.md — commit: pending ]
 ```
 
 ---
@@ -444,8 +446,8 @@ Template HS-1 … HS-10 apply verbatim. Master-plan additions:
 | Phase | Rubric criteria | Status | Proof location |
 |---|---|---|---|
 | Phase 0 — Repo & build | D1 | `[x] signed off` | plans/PHASE-0-EXECUTION.md |
-| Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[x] awaiting sign-off` | plans/PHASE-1-EXECUTION.md |
-| Phase 2 — Accounts & sync | B5 D2(partial) | `[ ]` | plans/PHASE-2-EXECUTION.md |
+| Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[x] signed off` | plans/PHASE-1-EXECUTION.md |
+| Phase 2 — Accounts & sync | B5 D2(partial) | `[x] awaiting sign-off` | plans/PHASE-2-EXECUTION.md |
 | Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[ ]` | plans/PHASE-P-EXECUTION.md |
 | Phase C — Content & trust | C1 C2 C4 | `[ ]` | phase §6 audit tables |
 | Phase V — Business gates | C3 C5 C7 C8 | `[ ]` | docs/RIGHTS_REVIEW.md · docs/PRICING.md |
