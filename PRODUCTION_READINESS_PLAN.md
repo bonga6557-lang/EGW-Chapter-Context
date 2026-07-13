@@ -11,7 +11,7 @@
 | **Plan Name** | `EGW-PROD-READY-2026` |
 | **Version** | `v1.4` |
 | **Agent ID / Session** | `[ assigned at execution of each phase ]` |
-| **Codebase / Repo** | `local: egw-chapter-context (NOT yet a git repo — Phase 0 fixes this)` |
+| **Codebase / Repo** | `github.com/bonga6557-lang/EGW-Chapter-Context` |
 | **Language / Stack** | `TypeScript + React 18 + Vite + Tailwind v4 + motion/react` |
 | **Plan Author** | `Operator (bn638260@gmail.com) with Claude` |
 | **Date Created** | `2026-07-13` |
@@ -45,9 +45,12 @@ Template §0 applies unchanged. Phase-specific interpretation:
 - **Phase 1 (routing/onboarding):** use a hash-based router or the smallest routing lib the
   bundle can justify; do NOT introduce a state-management library — existing `useState` +
   localStorage patterns stay.
-- **Phase 2 (accounts/sync/payments):** integrate a managed backend (recommended: Supabase)
+- **Phase 2 (accounts/sync):** integrate a managed backend (Supabase — operator-confirmed)
   rather than building auth, DB, and sync from scratch. Buying beats building here; the
-  minimal code is glue code.
+  minimal code is glue code. **Payments are DEFERRED** (operator decision 2026-07-13:
+  Stripe is unavailable in South Africa; monetization moves to a later plan revision —
+  candidate SA-compatible providers to evaluate then: Paystack, Paddle, Lemon Squeezy,
+  PayFast, Gumroad).
 - **Everywhere:** the app already has more UI features than it needs (rubric verdict).
   Any new feature not traceable to a rubric criterion ID (A1–D5) is bloat. Reject it.
 
@@ -71,7 +74,7 @@ to the PRODUCTION_READINESS_RUBRIC.md "🟢 Charge for it" verdict:
     in shipped content, explicit value-proposition screen, C7 rights sign-off recorded,
     C8 willingness-to-pay evidence collected.
   - Section D (Launch gate) pass: reproducible build (package.json committed, git repo,
-    CI-able), Supabase auth + sync, Stripe (or operator-chosen) payment gating,
+    CI-able), Supabase auth + sync (payment gating DEFERRED — see Phase 2 decisions),
     React error boundary, privacy-respecting analytics, cross-browser smoke tests.
 
 WHAT MUST NOT CHANGE:
@@ -90,7 +93,7 @@ Phase 1:  src/App.tsx, src/main.tsx, src/components/* (existing), index.html,
           src/index.css, NEW: src/router.ts(x), src/components/Onboarding.tsx,
           src/components/ErrorBoundary.tsx, src/utils/backup.ts
 Phase 2:  NEW: src/lib/supabase.ts, src/lib/sync.ts, src/components/Account.tsx,
-          src/components/Paywall.tsx, supabase/* (migrations, edge functions),
+          supabase/* (migrations, edge functions),
           .env.example (never .env), src/App.tsx (integration points only)
 Phase P:  src/App.tsx, src/index.css, vite.config.ts, src/data.ts (code-split imports),
           src/config/culturalImages.ts, test files under NEW: tests/
@@ -121,14 +124,15 @@ Existing:  react, react-dom, motion/react, lucide-react, tailwindcss v4, vite
 To add (each addition is a CP-02 line item requiring operator sign-off):
   Phase 1: ONE routing solution (recommend: hand-rolled hash router ~60 lines,
            zero deps; react-router only if hash router proves insufficient)
-  Phase 2: @supabase/supabase-js; Stripe via Payment Links or supabase edge
-           function (no stripe-js client dependency if Payment Links suffice)
+  Phase 2: @supabase/supabase-js (INSTALLED 2026-07-13; browser client at
+           src/lib/supabase.ts). No payment dependency — deferred.
   Phase P: vitest + @testing-library/react (dev-only); ONE privacy analytics
            snippet (recommend: Plausible or GoatCounter — no cookies, no consent
            banner needed)
-External systems: Supabase project (operator creates), Stripe account (operator
-           creates), deploy target (recommend: Netlify/Vercel/Cloudflare Pages),
+External systems: Supabase project (created: uqxckbbzfaqdidniosbc.supabase.co),
+           deploy target (recommend: Netlify/Vercel/Cloudflare Pages),
            egwwritings.org + BibleGateway (outbound links only).
+           Payment provider: deferred (SA-compatible options evaluated later).
 ```
 
 ### 1.5 Definition of done
@@ -142,8 +146,9 @@ External systems: Supabase project (operator creates), Stripe account (operator
 - tsc --noEmit: 0 errors. Full test suite: 0 failures. Smoke tests pass on
   Chrome, Firefox, Safari, iOS Safari, Android Chrome (evidence: screenshots +
   test output in each phase's §6).
-- A paying user can: sign up → pay → access gated content → take notes on one
-  device → see them on another → export everything → cancel.
+- A signed-up user can: sign up → take notes on one device → see them on
+  another → export everything → delete their data. (Pay/gate flow moves to the
+  monetization plan revision.)
 - docs/RIGHTS_REVIEW.md exists and is signed by the operator (C7 hard gate).
 - Each phase has its CP-06 Change Report in its §6 A.7.
 ```
@@ -223,40 +228,42 @@ v1 repositioning path avoids blocking launch on it) · Phase V ≈ 2 weeks calen
 
 ---
 
-### ◆ PHASE 2 · Accounts, sync, payments — rubric B5(full), D2
+### ◆ PHASE 2 · Accounts & sync — rubric B5(full); D2 partially DEFERRED
 
-**Status:** `[ PENDING ]` · **Depends:** Phase 1 · **Operator decisions required BEFORE CP-02:**
+**Status:** `[ PENDING ]` · **Depends:** Phase 1
 
 ```
-DECISION 2a — Backend: Supabase (RECOMMENDED: free tier, Postgres, auth + row-level
-              security in one) vs Firebase vs custom. Operator picks; plan assumes Supabase.
-DECISION 2b — Payments: Stripe Payment Links + entitlement check (RECOMMENDED, least code)
-              vs full Stripe Checkout integration vs Gumroad license keys.
-DECISION 2c — Pricing model (feeds Phase V docs/PRICING.md): one-time vs subscription vs
-              church/group license. Gating boundary: which books/features are free tier.
+DECISIONS RESOLVED (operator, 2026-07-13):
+  2a — Backend: Supabase. Project created (uqxckbbzfaqdidniosbc.supabase.co);
+       browser client committed at src/lib/supabase.ts; publishable creds in
+       .env.local (gitignored) and documented in .env.example.
+  2b — Payments: DEFERRED. Stripe unavailable in South Africa. No payment code,
+       no entitlement gating, no paywall UI in this plan revision. Rubric D2
+       is re-scoped to "auth + sync work" until a monetization revision picks
+       an SA-compatible provider (Paystack / Paddle / Lemon Squeezy / PayFast /
+       Gumroad — evaluate then).
+  2c — Pricing model: DEFERRED with 2b; Phase V still drafts docs/PRICING.md so
+       the eventual gating boundary is designed before code exists.
 ```
 
 #### Mission
-1. **Auth:** email magic-link sign-in (no passwords to manage). Anonymous/local use
-   keeps working forever — accounts are additive, never a wall in front of free content.
+1. **Auth:** email magic-link sign-in via Supabase (no passwords to manage).
+   Anonymous/local use keeps working forever — accounts are additive, never a wall.
 2. **Sync:** notes + explored-chapters synced to Supabase with row-level security;
    local-first (localStorage remains source of truth offline; last-write-wins with
    updated-at timestamps; conflicts logged, never silently dropped). One-time migration
    prompt imports existing local data into the new account.
-3. **Entitlements:** a `purchases` table keyed to user; Stripe webhook (Supabase edge
-   function) writes entitlement on successful payment; client gates paid content on
-   entitlement. IMPORTANT: client-side gating is UX only — paid chapter data must not
-   ship in the free bundle (this interacts with Phase P code-splitting; the split
-   boundary is the entitlement boundary).
-4. **Account UI:** sign in/out, purchase state, restore purchase, delete-my-data
-   (GDPR-shaped, also required by app-store rules if ever wrapped).
+3. **Account UI:** sign in/out, sync status, delete-my-data (GDPR-shaped).
+4. **Design-ahead constraint (costs nothing now, saves a rewrite later):** keep the
+   per-book code-split boundary (Phase P) clean, because when monetization lands the
+   split boundary becomes the entitlement boundary — paid chapter data must not ship
+   in the free bundle.
 
 #### Phase proof bar
-- [ ] End-to-end evidence: new user signs up on device A → buys (Stripe test mode) →
-      gated content unlocks → note written on A appears on device B. Screenshots + logs.
-- [ ] Evidence that unauthenticated bundle does NOT contain gated chapter data
-      (grep of built assets pasted).
-- [ ] Secrets audit: no keys in client bundle beyond the public anon key.
+- [ ] End-to-end evidence: sign up on device A → note written on A appears on
+      device B. Screenshots + logs.
+- [ ] RLS test evidence: user A cannot read user B's rows (SQL test output pasted).
+- [ ] Secrets audit: no keys in client bundle beyond the publishable key.
 
 ---
 
@@ -279,8 +286,8 @@ DECISION 2c — Pricing model (feeds Phase V docs/PRICING.md): one-time vs subsc
 5. **Meta/OG/favicon (A8):** title, description, OG image, favicon in index.html;
    per-route document.title via the Phase 1 router.
 6. **Tests (D5):** vitest + testing-library. Coverage floor: router state restore,
-   quiz scoring, notes persistence + export/import round-trip, entitlement gating
-   logic, search matching. CI script `npm test` wired into build.
+   quiz scoring, notes persistence + export/import round-trip, sync merge logic,
+   search matching. CI script `npm test` wired into build.
 7. **Analytics + feedback (D4):** privacy-respecting page/event analytics on the core
    loop (chapter opened, guided completed, quiz taken, export used) + a mailto/form
    feedback link in the footer.
@@ -336,7 +343,7 @@ DECISION 2c — Pricing model (feeds Phase V docs/PRICING.md): one-time vs subsc
    Feeds Phase 2 DECISION 2c.
 3. **Willingness-to-pay evidence (C8):** ≥ 10 target-audience users on the free/beta
    deploy (Phase 1 output is sufficient to demo); structured notes; ≥ 3 stated-price
-   commitments or pre-orders before flipping payments on.
+   commitments or pre-orders before building the (deferred) payment integration.
 
 #### Phase proof bar
 - [ ] docs/RIGHTS_REVIEW.md signed and dated by operator.
@@ -353,8 +360,9 @@ DECISION 2c — Pricing model (feeds Phase V docs/PRICING.md): one-time vs subsc
    to phase §6 appendices.
 2. All four section pass bars checked; no ×3 criterion below 3.
 3. Verdict recorded: 🟢 charge / 🟡 soft launch / 🔴 not yet — with reasons.
-4. If 🟢: enable Stripe live mode, announce, monitor analytics + feedback channel daily
-   for the first two weeks.
+4. If 🟢: launch free/beta publicly, announce, monitor analytics + feedback channel
+   daily for the first two weeks. Charging begins only after the monetization plan
+   revision (SA-compatible provider) is executed and HS-11 is satisfied.
 
 ---
 
@@ -375,9 +383,9 @@ Template v1.4 sections apply verbatim to every code phase. Additions specific to
 
 Template §4 applies verbatim. Project-specific additions:
 
-**FAILURE:** Supabase/Stripe sandbox behaves differently from docs.
+**FAILURE:** Supabase sandbox behaves differently from docs.
 **COUNTERMEASURE:** Minimal reproduction in a scratch file per template §4; cite the exact
-doc URL; never ship a workaround that bypasses the entitlement check.
+doc URL; never ship a workaround that bypasses row-level security.
 
 **FAILURE:** localStorage migration corrupts or loses a beta user's notes.
 **COUNTERMEASURE:** Migration NEVER deletes local keys (§1.1 invariant). Export-to-file is
@@ -436,7 +444,7 @@ Template HS-1 … HS-10 apply verbatim. Master-plan additions:
 |---|---|---|---|
 | Phase 0 — Repo & build | D1 | `[ ]` | plans/PHASE-0-EXECUTION.md |
 | Phase 1 — Flow foundations | B1 B3 B5min A2 D3 (+C1 labeling) | `[ ]` | plans/PHASE-1-EXECUTION.md |
-| Phase 2 — Accounts & payments | B5 D2 | `[ ]` | plans/PHASE-2-EXECUTION.md |
+| Phase 2 — Accounts & sync | B5 D2(partial) | `[ ]` | plans/PHASE-2-EXECUTION.md |
 | Phase P — Perf, polish, tests | A4 A6 A7 A8 B6 D4 D5 | `[ ]` | plans/PHASE-P-EXECUTION.md |
 | Phase C — Content & trust | C1 C2 C4 | `[ ]` | phase §6 audit tables |
 | Phase V — Business gates | C3 C5 C7 C8 | `[ ]` | docs/RIGHTS_REVIEW.md · docs/PRICING.md |
