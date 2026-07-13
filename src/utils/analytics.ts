@@ -7,6 +7,7 @@ declare global {
   interface Window {
     goatcounter?: {
       count?: (opts: { path?: string; title?: string; event?: boolean }) => void;
+      no_onload?: boolean;
     };
   }
 }
@@ -33,10 +34,15 @@ function goatCounterEndpoint(code: string): string {
 
 export function installAnalytics(): void {
   try {
-    if (analyticsInstalled || typeof document === 'undefined') return;
+    if (analyticsInstalled || typeof document === 'undefined' || typeof window === 'undefined') return;
 
     const code = import.meta.env.VITE_GOATCOUNTER_CODE?.trim();
     if (!code) return;
+
+    window.goatcounter = {
+      ...window.goatcounter,
+      no_onload: true,
+    };
 
     const existing = document.querySelector<HTMLScriptElement>('script[data-goatcounter]');
     if (existing) {

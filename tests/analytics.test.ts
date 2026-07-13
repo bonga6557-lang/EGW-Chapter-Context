@@ -4,6 +4,7 @@ import { installAnalytics } from '../src/utils/analytics';
 describe('installAnalytics', () => {
   afterEach(() => {
     document.head.innerHTML = '';
+    delete window.goatcounter;
     vi.unstubAllEnvs();
     vi.resetModules();
   });
@@ -22,5 +23,6 @@ describe('installAnalytics', () => {
     expect(script).not.toBeNull();
     expect(script?.src).toBe('https://gc.zgo.at/count.js');
     expect(script?.dataset.goatcounter).toBe('https://egw-study.goatcounter.com/count');
+    expect(window.goatcounter?.no_onload).toBe(true);
   });
 });
