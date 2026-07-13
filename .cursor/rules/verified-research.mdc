@@ -1,0 +1,63 @@
+---
+description: Citation integrity rules for adding quotes, sources, or chapter data — only verified information allowed
+globs: src/data/**,src/data.ts
+alwaysApply: false
+---
+
+# Verified Research
+
+Chapter data drives what learners read as fact. A prior audit found ~70% of
+scholarly "quotes" were fabricated wording attributed to real scholars. These
+rules stop that.
+
+## Prime rule
+
+Never write wording in a `quote` or `directQuote` field that you have not seen
+with your own eyes in the actual source (WebFetch of the real text, Google Books
+snippet, archive.org page). If you did not see it, it is a **summary** — write it
+attributively ("Knight argues that…"), never in the author's voice, never in
+quote marks. The UI shows quotation marks ONLY for `quoteType: 'verbatim'`.
+
+## Verification ladder → sets `quoteType`
+
+- **verbatim** — Fetched full text from a public-domain repo (perseus.tufts.edu,
+  newadvent.org, gutenberg.org, archive.org, ccel.org, egwwritings.org) and copied
+  it exactly. Needs `sourceUrl` + `verifyNote` naming edition and page.
+- **paraphrase** — Passage found but condensed/modernized. `sourceUrl` + `verifyNote`.
+- **summary** — Work is real but exact wording unseen. Reword attributively; best
+  `sourceUrl` (publisher / Google Books / Google Scholar) + `verifyNote:
+  "Companion summary — not a quotation."`
+- **not found** — Source can't be confirmed to exist → DO NOT include the entry.
+
+Never introduce `quoteType: 'unverified'` in new content. If you can't reach at
+least summary, remove the entry — do not ship it as unverified.
+
+## Bibliographic rules
+
+Verify author, exact title, publisher, and year before citing (the audit found
+wrong years and nonexistent titles for real scholars). Ellen White quotes must be
+checked on egwwritings.org and carry the book/page in `reference`.
+
+## Entry shapes (match src/types.ts)
+
+```ts
+// historicalSources[]
+{ title, author, publication, quote, relevance?,
+  quoteType: 'verbatim' | 'paraphrase' | 'summary',
+  sourceUrl, verifyNote }
+
+// scholarlyReferences[]
+{ author, year, title, source, relevance,
+  directQuote,                                  // attributive if not verbatim
+  quoteType: 'verbatim' | 'paraphrase' | 'summary',
+  sourceUrl, verifyNote }
+```
+
+## Checklist before finishing
+
+1. Every new entry has a `quoteType`.
+2. No quotation-voice wording under `summary`/`paraphrase`.
+3. No new `quoteType: 'unverified'`.
+4. `npx tsc --noEmit` passes.
+5. Grep the file for `quote:`/`directQuote:` and confirm each has a `quoteType`
+   nearby; delete anything you could not verify.
