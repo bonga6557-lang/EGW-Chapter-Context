@@ -423,7 +423,7 @@ per template). This master file keeps only the roll-up below.
 [ M.1 — 2026-07-13 — Phase 0 completed (signed off) — link: plans/PHASE-0-EXECUTION.md — commit: 584bf2c ]
 [ M.2 — 2026-07-13 — Phase 1 completed (signed off) — link: plans/PHASE-1-EXECUTION.md — commit: 08e9af4 ]
 [ M.3 — 2026-07-13 — Phase 2 completed (signed off) — link: plans/PHASE-2-EXECUTION.md — commit: 9ec6c4f ]
-[ M.4 — 2026-07-13 — Phase P completed (awaiting operator sign-off) — link: plans/PHASE-P-EXECUTION.md — commit: pending ]
+[ M.4 — 2026-07-13 — Phase P completed (awaiting operator sign-off) — link: plans/PHASE-P-EXECUTION.md — commit: d9dadc1 ]
 ```
 
 ---
