@@ -6,7 +6,7 @@ import { pk4Chapter } from './pk-4';
 import { pk5Chapter } from './pk-5';
 import { pk6Chapter } from './pk-6';
 import { pk7Chapter } from './pk-7';
-import { generatedProphetsAndKingsChapters } from './pk-generated';
+import { authoredProphetsAndKingsChapters } from './pk-authored';
 
 export const prophetsAndKingsData: ChapterContextType[] = [
   {
@@ -71,7 +71,7 @@ export const prophetsAndKingsData: ChapterContextType[] = [
   pk5Chapter,
   pk6Chapter,
   pk7Chapter,
-  ...generatedProphetsAndKingsChapters
+  ...authoredProphetsAndKingsChapters
 ];
 
 
