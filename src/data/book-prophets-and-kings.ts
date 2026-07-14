@@ -1,5 +1,12 @@
 import { ChapterContextType, BookType } from '../types';
 import { pk1Quiz } from './otherQuizzes';
+import { pk2Chapter } from './pk-2';
+import { pk3Chapter } from './pk-3';
+import { pk4Chapter } from './pk-4';
+import { pk5Chapter } from './pk-5';
+import { pk6Chapter } from './pk-6';
+import { pk7Chapter } from './pk-7';
+import { generatedProphetsAndKingsChapters } from './pk-generated';
 
 export const prophetsAndKingsData: ChapterContextType[] = [
   {
@@ -42,8 +49,9 @@ export const prophetsAndKingsData: ChapterContextType[] = [
     ],
     egwQuotes: [
       {
-        quote: "At the beginning of his reign Solomon knew that he was but a child, and in his helplessness he sought wisdom from God.",
-        reference: "Prophets and Kings, p. 30.1"
+        quote: "Solomon was never so rich or so wise or so truly great as when he confessed, \"I am but a little child: I know not how to go out or come in.\"",
+        reference: "Prophets and Kings, p. 30",
+        sourceUrl: "https://m.egwwritings.org/en/book/88.72"
       }
     ],
     scholarlyReferences: [],
@@ -52,11 +60,18 @@ export const prophetsAndKingsData: ChapterContextType[] = [
       "In what areas of your life are you relying on your own intellect rather than seeking divine wisdom?"
     ],
     quiz: pk1Quiz,
-    egwLink: "https://m.egwwritings.org/en/book/131/toc",
+    egwLink: "https://m.egwwritings.org/en/book/88.72",
     theme: "Wisdom & Humility",
     themes: ["Solomon", "Wisdom", "Leadership", "Humility"],
     readingTime: "7 min"
-  }
+  },
+  pk2Chapter,
+  pk3Chapter,
+  pk4Chapter,
+  pk5Chapter,
+  pk6Chapter,
+  pk7Chapter,
+  ...generatedProphetsAndKingsChapters
 ];
 
 

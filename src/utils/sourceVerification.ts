@@ -100,5 +100,8 @@ export function egwWritingsUrl(reference: string): string | undefined {
   if (/steps to christ/i.test(reference) || /stc/i.test(reference)) {
     return `https://m.egwwritings.org/en/book/108/${page}`;
   }
+  if (/prophets and kings/i.test(reference) || /\bpk\b/i.test(reference)) {
+    return `https://m.egwwritings.org/en/book/88/${page}`;
+  }
   return `https://m.egwwritings.org/en/search?query=${encodeURIComponent(reference)}`;
 }
